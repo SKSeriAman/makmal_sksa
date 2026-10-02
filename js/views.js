@@ -2273,10 +2273,10 @@ class ProfileView {
     const roleHint = document.getElementById('profileRoleHint');
     if (roleHint) {
       if (!isCoordinator) {
-        roleHint.innerHTML = `<i data-lucide="lock" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 3px;"></i>Jawatan hanya boleh ditetapkan atau diubah oleh Penyelaras ICT.`;
+        roleHint.innerHTML = `<i data-lucide="lock" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 3px;"></i>Jawatan hanya boleh ditetapkan  oleh Penyelaras ICT.`;
         roleHint.style.color = '#64748b';
       } else {
-        roleHint.innerHTML = `<i data-lucide="shield-check" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 3px; color: #16a34a;"></i>Penyelaras ICT (Akses Penuh)`;
+        roleHint.innerHTML = `<i data-lucide="shield-check" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 3px; color: #16a34a;"></i>Anda adalah Penyelaras ICT Sekolah`;
         roleHint.style.color = '#16a34a';
       }
     }
