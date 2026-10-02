@@ -95,7 +95,7 @@ setTimeout(() => {
 }, 1);
 
 // Ganti dengan Google Client ID anda daripada Google Cloud Console
-const GOOGLE_CLIENT_ID = "118978054225-phf7i5i89akttsqmqm6vge78oiaa89pt.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "1047769861262-t8q1k0t27bguijllvh8i428l4nfi58k8.apps.googleusercontent.com";
 
 const TIME_SLOTS = [
   "07:45 - 08:15",
