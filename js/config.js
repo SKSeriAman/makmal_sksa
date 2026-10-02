@@ -59,10 +59,7 @@ function autoClearUserCache() {
     console.warn("Gagal membersihkan cache secara automatik:", e);
   }
 
-  // 5. Auto muat balik data dalam masa 0.1 saat (100 milisaat)
-  setTimeout(() => {
-    reloadFreshData();
-  }, 1);
+
 }
 
 // Fungsi muat balik data segar daripada pangkalan data / pelayan
@@ -92,10 +89,13 @@ function reloadFreshData() {
 // Jalankan pembersihan cache serta-merta pada permulaan muat laman
 autoClearUserCache();
 
-
+// 5. Auto muat balik data dalam masa 0.1 saat (100 milisaat)
+setTimeout(() => {
+  reloadFreshData();
+}, 1);
 
 // Ganti dengan Google Client ID anda daripada Google Cloud Console
-const GOOGLE_CLIENT_ID = "118978054225-587be9hupkr97ovm0c5dp4eks3fjngdc.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "118978054225-phf7i5i89akttsqmqm6vge78oiaa89pt.apps.googleusercontent.com";
 
 const TIME_SLOTS = [
   "07:45 - 08:15",
