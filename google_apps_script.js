@@ -1,5 +1,5 @@
 /**
- * GOOGLE APPS SCRIPT FOR MAKMAL KOMPUTER SKPT
+ * GOOGLE APPS SCRIPT FOR MAKMAL KOMPUTER SKSA
  * Menyimpan Data Tempahan (Tab: Tempahan) & Data Pengguna (Tab: Pengguna)
  * dengan Sokongan UserID Automatik, Robust In-Place Row Status Update,
  * dan Pemprosesan Pukal (BATCH_ADD) Berprestasi Tinggi dengan LockService.

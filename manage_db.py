@@ -1,5 +1,5 @@
 """
-SKPT Computer Lab - Database Helper & Manager Script
+SKSA Computer Lab - Database Helper & Manager Script
 Memuatkan alat pengurusan pangkalan data SQLite.
 """
 
@@ -93,7 +93,7 @@ def reset_db():
         print("Operasi dibatalkan.")
 
 def main():
-    print("Alat Pengurusan Pangkalan Data SKPT")
+    print("Alat Pengurusan Pangkalan Data SKSA")
     print("1. Lihat Ringkasan Data (Summary)")
     print("2. Eksport Data ke JSON Backup")
     print("3. Reset Database (Padam dan bina semula)")

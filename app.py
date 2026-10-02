@@ -143,7 +143,7 @@ def serve_static(path):
 def health_check():
     return jsonify({
         "status": "ok",
-        "app": "Tempahan Makmal Komputer SKPT",
+        "app": "Tempahan Makmal Komputer SKSA",
         "engine": "Python Flask Web Application",
         "timestamp": datetime.datetime.now().isoformat()
     })
@@ -459,7 +459,7 @@ def admin_verify():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"============================================================")
-    print(f"  SKPT Computer Lab Booking - Python Web App (Flask Backend)")
+    print(f"  SKSA Computer Lab Booking - Python Web App (Flask Backend)")
     print(f"  Running locally at: http://localhost:{port}")
     print(f"============================================================")
     app.run(host='0.0.0.0', port=port, debug=True)

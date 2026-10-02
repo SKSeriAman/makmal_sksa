@@ -1669,7 +1669,7 @@ class ModalView {
     } catch (e) { }
     setField('slipDate', dateDisplay);
 
-    setField('slipLab', booking.labName || "Makmal Komputer SKPT");
+    setField('slipLab', booking.labName || "Makmal Komputer SKSA");
     setField('slipSlot', booking.slot || '-');
     setField('slipApplicant', booking.applicant || '-');
     setField('slipRole', booking.role || 'Guru / Tenaga Pengajar');

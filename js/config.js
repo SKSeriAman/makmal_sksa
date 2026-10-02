@@ -250,7 +250,7 @@ const CLASSES_TAHAP_2 = ["4 MUSYTARI", "5 ZUHAL", "6 NEPTUN"];
  * 1. WAJIB menggunakan SEMUA 5 hari persekolahan (Ahad hingga Khamis).
  * 2. Slot penggunaan BERUBAH dan PELBAGAI setiap hari & minggu (08:00-10:00, 08:30-10:30, 10:30-12:30, 11:00-13:00, 11:30-13:30).
  * 3. Setiap hari ADA WAKTU TERBUKA untuk guru lain membuat tempahan makmal (5 hingga 9 slot sehari).
- * 4. Mematuhi perhimpunan rasmi Ahad (08:00-08:30), rehat Tahap 1 (10:00-10:30), rehat Tahap 2 (10:30-11:00), dan waktu balik SKPT.
+ * 4. Mematuhi perhimpunan rasmi Ahad (08:00-08:30), rehat Tahap 1 (10:00-10:30), rehat Tahap 2 (10:30-11:00), dan waktu balik SKSA.
  */
 const ROTATING_WEEKLY_SCHEDULES = [
   // ===================== MINGGU 1 =====================

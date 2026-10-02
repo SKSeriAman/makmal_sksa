@@ -1,5 +1,5 @@
 """
-Starter script for SKPT Computer Lab Python Web Application
+Starter script for SKSA Computer Lab Python Web Application
 Runs app.py using the Python virtual environment (.venv) if available.
 """
 import os
