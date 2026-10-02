@@ -19,7 +19,7 @@ function getBackendApiUrl(path = '') {
 }
 
 // Paste Google Apps Script Web App URL here to enable live Google Sheets sync
-const GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbzWAm7DsyhihaAjdUTFq5gblppJrWlOs5MSnoWpZoZpEKc7XQJtKcLL63kP22fO6dgb/exec";
+const GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwPSO-6nYp_fVGDZj9d_NYxLNkbzHBwUKtIQj1vgETr8mlBSwXPp7OCMlndKX3sAxRX/exec";
 
 // ==========================================================================
 // AUTO CLEAR USER CACHE & AUTO RELOAD DATA IN 0.1 SECONDS (100ms)
@@ -95,22 +95,23 @@ autoClearUserCache();
 
 
 // Ganti dengan Google Client ID anda daripada Google Cloud Console
-const GOOGLE_CLIENT_ID = "118978054225-587be9hupkr97ovm0c5dp4eks3fjngdc.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "1047769861262-g1ns4ipe4lmvjlrmlturu2ssp8rl8meh.apps.googleusercontent.com";
 
 const TIME_SLOTS = [
-  "08:00 - 08:30",
-  "08:30 - 09:00",
-  "09:00 - 09:30",
-  "09:30 - 10:00",
-  "10:00 - 10:30",
-  "10:30 - 11:00",
-  "11:00 - 11:30",
-  "11:30 - 12:00",
-  "12:00 - 12:30",
-  "12:30 - 13:00",
-  "13:00 - 13:30",
-  "13:30 - 14:00",
-  "14:00 - 14:30"
+  "07:45 - 08:15",
+  "08:15 - 08:45",
+  "08:45 - 09:15",
+  "09:15 - 09:45",
+  "09:45 - 10:15",
+  "10:15 - 10:45",
+  "10:45 - 11:15",
+  "11:15 - 11:45",
+  "11:45 - 12:15",
+  "12:15 - 12:45",
+  "12:45 - 13:15",
+  "13:15 - 13:45",
+  "13:45 - 14:15",
+  "14:15 - 14:45"
 ];
 
 const DAY_NAMES_MY = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
@@ -233,17 +234,53 @@ class DateUtils {
   }
 }
 
-const ALL_CLASSES = {
-  "1 UTARID": { className: "1 UTARID", level: "Tahap 1", subject: "1 UTARID" },
-  "2 ZUHRAH": { className: "2 ZUHRAH", level: "Tahap 1", subject: "2 ZUHRAH" },
-  "3 MARIKH": { className: "3 MARIKH", level: "Tahap 1", subject: "3 MARIKH" },
-  "4 MUSYTARI": { className: "4 MUSYTARI", level: "Tahap 2", subject: "4 MUSYTARI" },
-  "5 ZUHAL": { className: "5 ZUHAL", level: "Tahap 2", subject: "5 ZUHAL" },
-  "6 NEPTUN": { className: "6 NEPTUN", level: "Tahap 2", subject: "6 NEPTUN" }
-};
+const DEFAULT_SCHOOL_CLASSES = [
+  { id: "CLS-1UTARID", name: "1 UTARID", level: "Tahap 1", pcs: 35, notes: "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)" },
+  { id: "CLS-2ZUHRAH", name: "2 ZUHRAH", level: "Tahap 1", pcs: 35, notes: "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)" },
+  { id: "CLS-3MARIKH", name: "3 MARIKH", level: "Tahap 1", pcs: 35, notes: "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)" },
+  { id: "CLS-4MUSYTARI", name: "4 MUSYTARI", level: "Tahap 2", pcs: 35, notes: "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)" },
+  { id: "CLS-5ZUHAL", name: "5 ZUHAL", level: "Tahap 2", pcs: 35, notes: "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)" },
+  { id: "CLS-6NEPTUN", name: "6 NEPTUN", level: "Tahap 2", pcs: 35, notes: "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)" }
+];
 
+const ALL_CLASSES = {};
 const CLASSES_TAHAP_1 = ["1 UTARID", "2 ZUHRAH", "3 MARIKH"];
 const CLASSES_TAHAP_2 = ["4 MUSYTARI", "5 ZUHAL", "6 NEPTUN"];
+
+function updateGlobalClassesLookup(classesList) {
+  if (!classesList || !Array.isArray(classesList) || classesList.length === 0) {
+    classesList = DEFAULT_SCHOOL_CLASSES;
+  }
+  for (const k in ALL_CLASSES) {
+    delete ALL_CLASSES[k];
+  }
+  CLASSES_TAHAP_1.length = 0;
+  CLASSES_TAHAP_2.length = 0;
+
+  classesList.forEach(c => {
+    if (!c || !c.name) return;
+    const cName = String(c.name).trim();
+    ALL_CLASSES[cName] = {
+      id: c.id || `CLS-${cName.replace(/\s+/g, '').toUpperCase()}`,
+      className: cName,
+      level: c.level || 'Tahap 1',
+      pcs: Number(c.pcs) || 35,
+      subject: cName,
+      notes: c.notes || ''
+    };
+    if (c.level === 'Tahap 1') {
+      CLASSES_TAHAP_1.push(cName);
+    } else if (c.level === 'Tahap 2') {
+      CLASSES_TAHAP_2.push(cName);
+    }
+  });
+
+  if (CLASSES_TAHAP_1.length === 0) CLASSES_TAHAP_1.push("1 UTARID", "2 ZUHRAH", "3 MARIKH");
+  if (CLASSES_TAHAP_2.length === 0) CLASSES_TAHAP_2.push("4 MUSYTARI", "5 ZUHAL", "6 NEPTUN");
+}
+
+// Inisialisasi awal
+updateGlobalClassesLookup(DEFAULT_SCHOOL_CLASSES);
 
 /**
  * Matriks Rotasi Jadual Mingguan (Kitaran 3 Minggu):

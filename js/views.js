@@ -240,6 +240,7 @@ class TableView {
   render() {
     this.renderBookingsList();
     this.renderUsersList();
+    this.renderClassesList();
   }
 
   renderBookingsList() {
@@ -482,6 +483,100 @@ class TableView {
               <button class="btn-gcal-white" style="padding: 5px 10px; font-size: 0.78rem; font-weight: 600; border-radius: 14px; border: 1px solid #cbd5e1; background: white; color: #334155; display: inline-flex; align-items: center; gap: 4px;" onclick="window.app.openEditUserModal('${userKey}')" title="Edit akaun pengguna">
                 <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
                 <span>Edit</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+  }
+
+  renderClassesList() {
+    const classTableBody = document.getElementById('classTableBody');
+    if (!classTableBody) return;
+
+    const allClasses = this.store.classes || [];
+    const searchInput = document.getElementById('classSearchInput');
+    const levelFilter = document.getElementById('classLevelFilter');
+
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const selectedLevel = levelFilter ? levelFilter.value : 'ALL';
+
+    const filteredClasses = allClasses.filter(c => {
+      const matchQuery = !query ||
+        (c.name && c.name.toLowerCase().includes(query)) ||
+        (c.notes && c.notes.toLowerCase().includes(query)) ||
+        (c.id && c.id.toLowerCase().includes(query));
+      const matchLevel = (selectedLevel === 'ALL') || (c.level === selectedLevel);
+      return matchQuery && matchLevel;
+    });
+
+    const countBadge = document.getElementById('countClassesBadge');
+    if (countBadge) countBadge.textContent = filteredClasses.length;
+
+    if (filteredClasses.length === 0) {
+      classTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 36px 16px; color: var(--gcal-text-subtle);">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+              <i data-lucide="school" style="width: 32px; height: 32px; color: #94a3b8;"></i>
+              <span style="font-size: 0.95rem; font-weight: 600; color: #475569;">Tiada rekod kelas dijumpai.</span>
+              <small style="color: #94a3b8;">Klik butang "Tambah Kelas Baru" untuk mendaftar kelas baharu.</small>
+            </div>
+          </td>
+        </tr>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    classTableBody.innerHTML = filteredClasses.map((c, idx) => {
+      const isTahap1 = c.level === 'Tahap 1';
+      const badgeStyle = isTahap1
+        ? 'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;'
+        : 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;';
+      const timeNote = isTahap1
+        ? 'Waktu Balik 12:30/1:00 PM • Rehat 10:00-10:30 AM'
+        : 'Waktu Balik 1:30 PM • Rehat 10:30-11:00 AM';
+
+      return `
+        <tr>
+          <td style="text-align: center; color: var(--gcal-text-subtle); font-weight: 600;">${idx + 1}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 34px; height: 34px; border-radius: 8px; background: ${isTahap1 ? '#f0f9ff' : '#fffbeb'}; border: 1px solid ${isTahap1 ? '#bae6fd' : '#fde68a'}; display: flex; align-items: center; justify-content: center; color: ${isTahap1 ? '#0284c7' : '#d97706'}; font-weight: 700; font-size: 0.9rem;">
+                ${c.name.substring(0, 1)}
+              </div>
+              <div>
+                <strong style="font-size: 0.95rem; color: var(--gcal-text-dark);">${c.name}</strong>
+                <br><span style="font-size: 0.72rem; background: var(--gcal-blue-light); color: var(--gcal-blue-dark); padding: 1px 6px; border-radius: 8px; font-weight: 600; font-family: monospace;">${c.id}</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span style="${badgeStyle} padding: 4px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+              <i data-lucide="${isTahap1 ? 'sun' : 'moon'}" style="width: 13px; height: 13px;"></i>
+              ${c.level}
+            </span>
+          </td>
+          <td>
+            <strong style="color: #1e293b;">${c.pcs || 35}</strong> <span style="font-size: 0.78rem; color: var(--gcal-text-subtle);">Komputer / Murid</span>
+          </td>
+          <td>
+            <div style="font-size: 0.82rem; font-weight: 600; color: #334155;">${c.notes || '-'}</div>
+            <small style="color: #64748b; font-size: 0.72rem;">${timeNote}</small>
+          </td>
+          <td style="text-align: right; white-space: nowrap;">
+            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+              <button class="btn-gcal-white" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 600; border-radius: 14px; border: 1px solid #cbd5e1; background: white; color: #1e293b; display: inline-flex; align-items: center; gap: 4px;" onclick="window.app.openEditClassModal('${c.id}')" title="Kemaskini maklumat kelas ini">
+                <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i>
+                <span>Edit</span>
+              </button>
+              <button class="btn-gcal-red" style="padding: 5px 10px; font-size: 0.78rem; font-weight: 600; border-radius: 14px; display: inline-flex; align-items: center; gap: 4px;" onclick="window.app.deleteClass('${c.id}')" title="Padam kelas ini dari senarai">
+                <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                <span>Padam</span>
               </button>
             </div>
           </td>
@@ -1757,6 +1852,132 @@ class ModalView {
       this.app.showToast(`Akaun ${updated.name} (${updated.email}) berjaya dikemaskini!`, "success");
     } catch (err) {
       this.app.showToast(err.message, "error");
+    }
+  }
+
+  // ========================================================================
+  // PENGURUSAN KELAS MAKMAL (MODAL)
+  // ========================================================================
+  populateFormSubjectOptions() {
+    const formSubject = document.getElementById('formSubject');
+    if (!formSubject) return;
+    const currentVal = formSubject.value;
+    const classes = this.store.classes || [];
+    let html = '';
+    classes.forEach(c => {
+      html += `<option value="${c.name}">${c.name} (${c.level})</option>`;
+    });
+    html += `<option value="PRA SEKOLAH">PRA SEKOLAH</option>`;
+    html += `<option value="LAIN-LAIN">LAIN-LAIN</option>`;
+    formSubject.innerHTML = html;
+    if (currentVal && Array.from(formSubject.options).some(o => o.value === currentVal)) {
+      formSubject.value = currentVal;
+    }
+  }
+
+  openAddClassModal() {
+    if (!this.app.authStore.isLabCoordinator()) {
+      this.app.showToast("Hanya Penyelaras ICT dibenarkan mengurus senarai kelas.", "error");
+      return;
+    }
+    const modal = document.getElementById('classModal');
+    const title = document.getElementById('classModalTitle');
+    const idInput = document.getElementById('classModalId');
+    const nameInput = document.getElementById('classModalName');
+    const levelInput = document.getElementById('classModalLevel');
+    const pcsInput = document.getElementById('classModalPcs');
+    const notesInput = document.getElementById('classModalNotes');
+
+    if (idInput) idInput.value = '';
+    if (nameInput) { nameInput.value = ''; nameInput.focus(); }
+    if (levelInput) levelInput.value = 'Tahap 1';
+    if (pcsInput) pcsInput.value = 35;
+    if (notesInput) notesInput.value = '';
+    if (title) title.textContent = 'Tambah Kelas Baharu';
+
+    if (modal) {
+      modal.classList.add('active');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  openEditClassModal(classId) {
+    if (!this.app.authStore.isLabCoordinator()) {
+      this.app.showToast("Hanya Penyelaras ICT dibenarkan mengurus senarai kelas.", "error");
+      return;
+    }
+    const cleanId = String(classId || '').trim().toLowerCase();
+    const cls = this.store.classes.find(c => (c.id && c.id.toLowerCase() === cleanId) || c.name.toLowerCase() === cleanId);
+    if (!cls) {
+      this.app.showToast("Kelas tidak dijumpai.", "error");
+      return;
+    }
+
+    const modal = document.getElementById('classModal');
+    const title = document.getElementById('classModalTitle');
+    const idInput = document.getElementById('classModalId');
+    const nameInput = document.getElementById('classModalName');
+    const levelInput = document.getElementById('classModalLevel');
+    const pcsInput = document.getElementById('classModalPcs');
+    const notesInput = document.getElementById('classModalNotes');
+
+    if (idInput) idInput.value = cls.id;
+    if (nameInput) nameInput.value = cls.name;
+    if (levelInput) levelInput.value = cls.level || 'Tahap 1';
+    if (pcsInput) pcsInput.value = cls.pcs || 35;
+    if (notesInput) notesInput.value = cls.notes || '';
+    if (title) title.textContent = `Kemaskini Kelas: ${cls.name}`;
+
+    if (modal) {
+      modal.classList.add('active');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  closeClassModal() {
+    const modal = document.getElementById('classModal');
+    if (modal) {
+      modal.classList.remove('active');
+    }
+  }
+
+  async handleClassSubmit(e) {
+    if (e) e.preventDefault();
+    if (!this.app.authStore.isLabCoordinator()) {
+      this.app.showToast("Hanya Penyelaras ICT dibenarkan mengurus senarai kelas.", "error");
+      return;
+    }
+
+    const idInput = document.getElementById('classModalId');
+    const nameInput = document.getElementById('classModalName');
+    const levelInput = document.getElementById('classModalLevel');
+    const pcsInput = document.getElementById('classModalPcs');
+    const notesInput = document.getElementById('classModalNotes');
+
+    const id = idInput ? idInput.value.trim() : '';
+    const name = nameInput ? nameInput.value.trim().toUpperCase() : '';
+    const level = levelInput ? levelInput.value : 'Tahap 1';
+    const pcs = pcsInput ? parseInt(pcsInput.value, 10) || 35 : 35;
+    const notes = notesInput ? notesInput.value.trim() : '';
+
+    if (!name) {
+      this.app.showToast("Sila masukkan nama kelas.", "error");
+      return;
+    }
+
+    try {
+      if (id) {
+        await this.store.updateClass(id, { name, level, pcs, notes });
+        this.app.showToast(`Kelas "${name}" berjaya dikemaskini dan diselaras ke Google Sheet.`, "success");
+      } else {
+        await this.store.addClass({ name, level, pcs, notes });
+        this.app.showToast(`Kelas "${name}" berjaya ditambah dan diselaras ke Google Sheet.`, "success");
+      }
+      this.closeClassModal();
+      this.app.render();
+      this.app.tableView.renderClassesList();
+    } catch (err) {
+      this.app.showToast(err.message || "Ralat menyimpan kelas.", "error");
     }
   }
 

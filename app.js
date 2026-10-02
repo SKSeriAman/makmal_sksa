@@ -31,10 +31,13 @@ class App {
         this.store.fetchFromSheet(),
         (this.authStore && typeof this.authStore.fetchUsersFromSheet === 'function')
           ? this.authStore.fetchUsersFromSheet()
+          : Promise.resolve(),
+        (this.store && typeof this.store.fetchClassesFromSheet === 'function')
+          ? this.store.fetchClassesFromSheet()
           : Promise.resolve()
       ]);
       this.render();
-      console.log("[LabBook System] Data makmal & pengguna berjaya diselaraskan daripada Google Sheet!");
+      console.log("[LabBook System] Data makmal, pengguna & senarai kelas berjaya diselaraskan daripada Google Sheet!");
     } catch (e) {
       console.warn("Ralat penyelarasan awal Google Sheet:", e);
     }
@@ -45,12 +48,23 @@ class App {
       if (this.authStore && typeof this.authStore.fetchUsersFromBackend === 'function') {
         this.authStore.fetchUsersFromBackend();
       }
+      if (this.store && typeof this.store.fetchClassesFromPythonBackend === 'function') {
+        this.store.fetchClassesFromPythonBackend();
+      }
     } catch (e) { }
   }
 
   render() {
     this.headerView.render();
     this.calendarView.render();
+    if (this.modalView && typeof this.modalView.populateFormSubjectOptions === 'function') {
+      this.modalView.populateFormSubjectOptions();
+    }
+
+    const countClassesBadge = document.getElementById('countClassesBadge');
+    if (countClassesBadge && this.store.classes) {
+      countClassesBadge.textContent = this.store.classes.length;
+    }
 
     // Kawalan paparan Tab Sejarah Tempahan (Hanya Boleh Dilihat Selepas Log Masuk)
     const isLoggedIn = this.authStore.isLoggedIn();
@@ -531,19 +545,54 @@ class App {
     if (userUsageStatusFilter) {
       userUsageStatusFilter.addEventListener('change', () => this.modalView.renderUserUsageBookings());
     }
+
+    // Class Management Modal Events (Penyelaras ICT)
+    const classForm = document.getElementById('classForm');
+    if (classForm) {
+      classForm.addEventListener('submit', (e) => this.modalView.handleClassSubmit(e));
+    }
+
+    const btnCloseClassModal = document.getElementById('btnCloseClassModal');
+    if (btnCloseClassModal) {
+      btnCloseClassModal.addEventListener('click', () => this.modalView.closeClassModal());
+    }
+
+    const btnCancelClassModal = document.getElementById('btnCancelClassModal');
+    if (btnCancelClassModal) {
+      btnCancelClassModal.addEventListener('click', () => this.modalView.closeClassModal());
+    }
+
+    const classModal = document.getElementById('classModal');
+    if (classModal) {
+      classModal.addEventListener('click', (e) => {
+        if (e.target === classModal) this.modalView.closeClassModal();
+      });
+    }
+
+    const classSearchInput = document.getElementById('classSearchInput');
+    if (classSearchInput) {
+      classSearchInput.addEventListener('input', () => this.tableView.renderClassesList());
+    }
+
+    const classLevelFilter = document.getElementById('classLevelFilter');
+    if (classLevelFilter) {
+      classLevelFilter.addEventListener('change', () => this.tableView.renderClassesList());
+    }
   }
 
   switchPenyelarasSubtab(subtab) {
     const btnBookings = document.getElementById('subtabBtnBookings');
     const btnGenerator = document.getElementById('subtabBtnGenerator');
     const btnUsers = document.getElementById('subtabBtnUsers');
+    const btnClasses = document.getElementById('subtabBtnClasses');
 
     const contentBookings = document.getElementById('subtabContentBookings');
     const contentGenerator = document.getElementById('subtabContentGenerator');
     const contentUsers = document.getElementById('subtabContentUsers');
+    const contentClasses = document.getElementById('subtabContentClasses');
 
-    [btnBookings, btnGenerator, btnUsers].forEach(b => { if (b) b.classList.remove('active'); });
-    [contentBookings, contentGenerator, contentUsers].forEach(c => { if (c) c.style.display = 'none'; });
+    [btnBookings, btnGenerator, btnUsers, btnClasses].forEach(b => { if (b) b.classList.remove('active'); });
+    [contentBookings, contentGenerator, contentUsers, contentClasses].forEach(c => { if (c) c.style.display = 'none'; });
 
     if (subtab === 'generator') {
       if (btnGenerator) btnGenerator.classList.add('active');
@@ -553,12 +602,105 @@ class App {
       if (btnUsers) btnUsers.classList.add('active');
       if (contentUsers) contentUsers.style.display = 'block';
       this.tableView.renderUsersList();
+    } else if (subtab === 'classes') {
+      if (btnClasses) btnClasses.classList.add('active');
+      if (contentClasses) contentClasses.style.display = 'block';
+      this.tableView.renderClassesList();
     } else {
       if (btnBookings) btnBookings.classList.add('active');
       if (contentBookings) contentBookings.style.display = 'block';
       this.tableView.renderBookingsList();
     }
     if (window.lucide) lucide.createIcons();
+  }
+
+  filterClassesList() {
+    this.tableView.renderClassesList();
+  }
+
+  openAddClassModal() {
+    if (!this.authStore.isLabCoordinator()) {
+      this.showToast("Akses dinafikan. Hanya Penyelaras ICT sahaja yang boleh menambah kelas.", "error");
+      return;
+    }
+    this.modalView.openAddClassModal();
+  }
+
+  openEditClassModal(classId) {
+    if (!this.authStore.isLabCoordinator()) {
+      this.showToast("Akses dinafikan. Hanya Penyelaras ICT sahaja yang boleh kemaskini kelas.", "error");
+      return;
+    }
+    this.modalView.openEditClassModal(classId);
+  }
+
+  async deleteClass(classId) {
+    if (!this.authStore.isLabCoordinator()) {
+      this.showToast("Akses dinafikan. Hanya Penyelaras ICT sahaja yang boleh memadam kelas.", "error");
+      return;
+    }
+    const cleanId = String(classId || '').trim();
+    const cls = this.store.classes.find(c => (c.id && c.id.toLowerCase() === cleanId.toLowerCase()) || c.name.toLowerCase() === cleanId.toLowerCase());
+    const name = cls ? cls.name : cleanId;
+
+    if (!confirm(`Adakah anda pasti mahu memadam kelas "${name}"?\nTindakan ini akan memadam rekod kelas daripada sistem dan Google Sheet.`)) {
+      return;
+    }
+
+    try {
+      await this.store.deleteClass(cleanId);
+      this.showToast(`Kelas "${name}" telah berjaya dipadam dari sistem dan Google Sheet.`, "info");
+      this.render();
+      this.tableView.renderClassesList();
+    } catch (err) {
+      this.showToast(err.message || "Ralat memadam kelas.", "error");
+    }
+  }
+
+  async resetClassesToDefault() {
+    if (!this.authStore.isLabCoordinator()) {
+      this.showToast("Akses dinafikan. Hanya Penyelaras ICT dibenarkan.", "error");
+      return;
+    }
+    if (!confirm("Adakah anda pasti mahu menetapkan semula senarai kelas kepada 6 kelas lalai asas SKSA?\n(1 UTARID, 2 ZUHRAH, 3 MARIKH, 4 MUSYTARI, 5 ZUHAL, 6 NEPTUN)")) {
+      return;
+    }
+    try {
+      await this.store.resetClassesToDefault();
+      this.showToast("Senarai kelas telah diset semula ke default SKSA dan diselaras ke Google Sheet.", "success");
+      this.render();
+      this.tableView.renderClassesList();
+    } catch (err) {
+      this.showToast(err.message || "Ralat set semula kelas.", "error");
+    }
+  }
+
+  async syncClassesToGoogleSheet() {
+    if (!this.authStore.isLabCoordinator()) {
+      this.showToast("Akses dinafikan.", "error");
+      return;
+    }
+    const btn = document.getElementById('btnSyncClassesToSheet');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="spin" style="width:14px; height:14px;"></i><span>Menyelaras...</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      this.showToast("Menyelaras senarai kelas ke Google Sheet...", "info");
+      const res = await this.store.syncClassesToGoogleSheet();
+      this.showToast(`Berjaya! Sebanyak ${res.count || this.store.classes.length} kelas telah diselaras ke Google Sheet.`, "success");
+    } catch (err) {
+      this.showToast("Ralat menyelaraskan kelas ke Google Sheet: " + (err.message || err), "error");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
   }
 
   filterUsersList() {

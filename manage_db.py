@@ -38,8 +38,12 @@ def show_summary():
     cursor.execute("SELECT COUNT(*) FROM bookings")
     booking_count = cursor.fetchone()[0]
 
+    cursor.execute("SELECT COUNT(*) FROM classes")
+    class_count = cursor.fetchone()[0]
+
     print(f"👥 Jumlah Pengguna Berdaftar : {user_count}")
     print(f"📅 Jumlah Tempahan Makmal   : {booking_count}")
+    print(f"🏫 Jumlah Kelas Makmal      : {class_count}")
     print("-" * 50)
 
     print("\n[ 1. SENARAI PENGGUNA (users) ]")
@@ -47,7 +51,12 @@ def show_summary():
     for u in cursor.fetchall():
         print(f" • {u['name']} ({u['email']}) - {u['role']}")
 
-    print("\n[ 2. SENARAI TEMPAHAN (bookings) ]")
+    print("\n[ 2. SENARAI KELAS (classes) ]")
+    cursor.execute("SELECT id, name, level, pcs FROM classes ORDER BY level, name")
+    for c in cursor.fetchall():
+        print(f" • [{c['id']}] {c['name']} ({c['level']}) - {c['pcs']} PC")
+
+    print("\n[ 3. SENARAI TEMPAHAN (bookings) ]")
     cursor.execute("SELECT id, date, slot, applicant, subject, status FROM bookings ORDER BY date DESC")
     for b in cursor.fetchall():
         print(f" • [{b['id']}] {b['date']} | {b['slot']} | {b['applicant']} ({b['subject']}) -> STATUS: {b['status']}")
@@ -69,9 +78,13 @@ def export_json():
     cursor.execute("SELECT * FROM bookings")
     bookings = [dict(r) for r in cursor.fetchall()]
 
+    cursor.execute("SELECT * FROM classes")
+    classes = [dict(r) for r in cursor.fetchall()]
+
     data = {
         "users": users,
-        "bookings": bookings
+        "bookings": bookings,
+        "classes": classes
     }
 
     out_file = os.path.join(os.path.dirname(__file__), 'db_backup.json')

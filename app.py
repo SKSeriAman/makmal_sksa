@@ -52,6 +52,31 @@ def init_db():
             registeredAt TEXT
         )
     ''')
+
+    # Table Classes (Senarai Kelas Makmal Sekolah)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS classes (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE,
+            level TEXT,
+            pcs INTEGER,
+            notes TEXT,
+            updatedAt TEXT
+        )
+    ''')
+
+    # Seed initial classes if empty
+    cursor.execute("SELECT COUNT(*) FROM classes")
+    if cursor.fetchone()[0] == 0:
+        initial_classes = [
+            ("CLS-1UTARID", "1 UTARID", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", datetime.datetime.now().isoformat()),
+            ("CLS-2ZUHRAH", "2 ZUHRAH", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", datetime.datetime.now().isoformat()),
+            ("CLS-3MARIKH", "3 MARIKH", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", datetime.datetime.now().isoformat()),
+            ("CLS-4MUSYTARI", "4 MUSYTARI", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", datetime.datetime.now().isoformat()),
+            ("CLS-5ZUHAL", "5 ZUHAL", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", datetime.datetime.now().isoformat()),
+            ("CLS-6NEPTUN", "6 NEPTUN", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", datetime.datetime.now().isoformat())
+        ]
+        cursor.executemany("INSERT INTO classes VALUES (?, ?, ?, ?, ?, ?)", initial_classes)
     
     # Migration to add userId & userEmail column if missing in existing DB
     try:
@@ -455,6 +480,127 @@ def admin_verify():
     if pin == '1234':
         return jsonify({"status": "success", "verified": True})
     return jsonify({"status": "error", "message": "Kod PIN Admin tidak sah."}), 401
+
+# ==========================================
+# API PENGURUSAN KELAS (PENYELARAS ICT)
+# ==========================================
+
+# GET /api/classes
+@app.route('/api/classes', methods=['GET'])
+def get_classes():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, level, pcs, notes, updatedAt FROM classes ORDER BY level ASC, name ASC")
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({"status": "success", "data": rows})
+
+# POST /api/classes (Tambah / Kemaskini Kelas)
+@app.route('/api/classes', methods=['POST'])
+def save_class():
+    data = request.json or {}
+    name = (data.get('name') or '').strip().upper()
+    if not name:
+        return jsonify({"status": "error", "message": "Nama kelas diperlukan."}), 400
+
+    class_id = data.get('id') or f"CLS-{name.replace(' ', '')}"
+    level = data.get('level') or 'Tahap 1'
+    pcs = int(data.get('pcs') or 35)
+    notes = data.get('notes') or ''
+    updated_at = datetime.datetime.now().isoformat()
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO classes (id, name, level, pcs, notes, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            level = excluded.level,
+            pcs = excluded.pcs,
+            notes = excluded.notes,
+            updatedAt = excluded.updatedAt
+    """, (class_id, name, level, pcs, notes, updated_at))
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "message": f"Kelas {name} berjaya disimpan.",
+        "data": {
+            "id": class_id,
+            "name": name,
+            "level": level,
+            "pcs": pcs,
+            "notes": notes,
+            "updatedAt": updated_at
+        }
+    })
+
+# DELETE /api/classes/<class_id> (Padam Kelas)
+@app.route('/api/classes/<class_id>', methods=['DELETE'])
+def delete_class(class_id):
+    clean_id = class_id.strip()
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM classes WHERE id = ? OR UPPER(name) = UPPER(?)", (clean_id, clean_id))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    if affected > 0:
+        return jsonify({"status": "success", "message": f"Kelas {class_id} berjaya dipadam."})
+    return jsonify({"status": "warning", "message": f"Kelas {class_id} tidak ditemui."})
+
+# POST /api/classes/sync (Penyelarasan Pukal Senarai Kelas)
+@app.route('/api/classes/sync', methods=['POST'])
+def sync_classes():
+    data = request.json or {}
+    classes_list = data.get('classes') or []
+    if not isinstance(classes_list, list):
+        return jsonify({"status": "error", "message": "Data kelas tidak sah."}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM classes")
+    
+    rows_to_insert = []
+    now = datetime.datetime.now().isoformat()
+    for c in classes_list:
+        c_name = str(c.get('name', '')).strip().upper()
+        if not c_name:
+            continue
+        c_id = c.get('id') or f"CLS-{c_name.replace(' ', '')}"
+        c_level = c.get('level') or 'Tahap 1'
+        c_pcs = int(c.get('pcs') or 35)
+        c_notes = c.get('notes') or ''
+        rows_to_insert.append((c_id, c_name, c_level, c_pcs, c_notes, c.get('updatedAt') or now))
+
+    if rows_to_insert:
+        cursor.executemany("INSERT INTO classes VALUES (?, ?, ?, ?, ?, ?)", rows_to_insert)
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": f"{len(rows_to_insert)} kelas berjaya diselaraskan.", "count": len(rows_to_insert)})
+
+# POST /api/classes/reset (Tetapkan Semula ke Kelas Lalai SKSA)
+@app.route('/api/classes/reset', methods=['POST'])
+def reset_classes():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM classes")
+    initial_classes = [
+        ("CLS-1UTARID", "1 UTARID", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", datetime.datetime.now().isoformat()),
+        ("CLS-2ZUHRAH", "2 ZUHRAH", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", datetime.datetime.now().isoformat()),
+        ("CLS-3MARIKH", "3 MARIKH", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", datetime.datetime.now().isoformat()),
+        ("CLS-4MUSYTARI", "4 MUSYTARI", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", datetime.datetime.now().isoformat()),
+        ("CLS-5ZUHAL", "5 ZUHAL", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", datetime.datetime.now().isoformat()),
+        ("CLS-6NEPTUN", "6 NEPTUN", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", datetime.datetime.now().isoformat())
+    ]
+    cursor.executemany("INSERT INTO classes VALUES (?, ?, ?, ?, ?, ?)", initial_classes)
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Senarai kelas telah diset semula kepada default SKSA."})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

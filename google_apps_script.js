@@ -1,7 +1,7 @@
 /**
  * GOOGLE APPS SCRIPT FOR MAKMAL KOMPUTER SKSA
- * Menyimpan Data Tempahan (Tab: Tempahan) & Data Pengguna (Tab: Pengguna)
- * dengan Sokongan UserID Automatik, Robust In-Place Row Status Update,
+ * Menyimpan Data Tempahan (Tab: Tempahan), Pengguna (Tab: Pengguna) & Senarai Kelas (Tab: Kelas)
+ * dengan Sokongan UserID Automatik, Pengurusan Kelas Fleksibel, Robust In-Place Row Status Update,
  * dan Pemprosesan Pukal (BATCH_ADD) Berprestasi Tinggi dengan LockService.
  */
 
@@ -24,6 +24,8 @@ function testRun() {
   Logger.log("Tab 'Tempahan' sedia: " + sheet.getName());
   var userSheet = getOrCreateSheet(ss, "Pengguna");
   Logger.log("Tab 'Pengguna' sedia: " + userSheet.getName());
+  var classSheet = getOrCreateSheet(ss, "Kelas");
+  Logger.log("Tab 'Kelas' sedia: " + classSheet.getName());
   return "Berjaya! Pangkalan data sedia.";
 }
 
@@ -120,7 +122,45 @@ function doGet(e) {
     return responseJSON({ status: "success", users: users });
   }
 
-  // 2. DAPATKAN SENARAI TEMPAHAN (Default GET)
+  // 2. DAPATKAN SENARAI KELAS (GET_CLASSES)
+  if (action === "GET_CLASSES") {
+    var classSheet = getOrCreateSheet(ss, "Kelas");
+    if (classSheet.getLastRow() === 0) {
+      classSheet.appendRow(["ID Kelas", "Nama Kelas", "Tahap", "Bilangan Murid / PC", "Catatan", "Tarikh Kemaskini"]);
+      classSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#e8f0fe");
+      var initialClasses = [
+        ["CLS-1UTARID", "1 UTARID", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", new Date().toLocaleString('ms-MY')],
+        ["CLS-2ZUHRAH", "2 ZUHRAH", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", new Date().toLocaleString('ms-MY')],
+        ["CLS-3MARIKH", "3 MARIKH", "Tahap 1", 35, "Tahap 1 (Waktu balik 12:30/1:00 PM, Rehat 10:00-10:30 AM)", new Date().toLocaleString('ms-MY')],
+        ["CLS-4MUSYTARI", "4 MUSYTARI", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", new Date().toLocaleString('ms-MY')],
+        ["CLS-5ZUHAL", "5 ZUHAL", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", new Date().toLocaleString('ms-MY')],
+        ["CLS-6NEPTUN", "6 NEPTUN", "Tahap 2", 35, "Tahap 2 (Waktu balik 1:30 PM, Rehat 10:30-11:00 AM)", new Date().toLocaleString('ms-MY')]
+      ];
+      classSheet.getRange(2, 1, initialClasses.length, 6).setValues(initialClasses);
+    }
+
+    var data = classSheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return responseJSON({ status: "success", classes: [] });
+    }
+    var classes = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (row[0] || row[1]) {
+        classes.push({
+          id: String(row[0] || ""),
+          name: String(row[1] || ""),
+          level: String(row[2] || "Tahap 1"),
+          pcs: Number(row[3]) || 35,
+          notes: String(row[4] || ""),
+          updatedAt: String(row[5] || "")
+        });
+      }
+    }
+    return responseJSON({ status: "success", classes: classes });
+  }
+
+  // 3. DAPATKAN SENARAI TEMPAHAN (Default GET)
   var bookingSheet = getOrCreateSheet(ss, "Tempahan");
   var data = bookingSheet.getDataRange().getValues();
   if (data.length <= 1) {
@@ -235,7 +275,98 @@ function doPost(e) {
       return responseJSON({ status: "success", userId: userId, message: "Rekod pengguna diselaraskan." });
     }
 
-    // 2. REKOD TEMPAHAN PUKAL (BATCH_ADD / SYNC_ALL) - KESELAMATAN 100% TIADA SLOT TERCICIR
+    // 2. PENGURUSAN KELAS OLEH PENYELARAS ICT (Tab: Kelas)
+    if (data.action === "SYNC_CLASSES") {
+      var classSheet = getOrCreateSheet(ss, "Kelas");
+      classSheet.clearContents();
+      classSheet.appendRow(["ID Kelas", "Nama Kelas", "Tahap", "Bilangan Murid / PC", "Catatan", "Tarikh Kemaskini"]);
+      classSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#e8f0fe");
+
+      var list = data.classes || [];
+      if (list.length > 0) {
+        var rowsToAdd = list.map(function(c, idx) {
+          var cid = c.id || ("CLS-" + (c.name ? c.name.replace(/\s+/g, '').toUpperCase() : (idx + 1)));
+          return [
+            cid,
+            c.name || "",
+            c.level || "Tahap 1",
+            c.pcs || 35,
+            c.notes || "",
+            c.updatedAt || new Date().toLocaleString('ms-MY')
+          ];
+        });
+        classSheet.getRange(2, 1, rowsToAdd.length, 6).setValues(rowsToAdd);
+      }
+      return responseJSON({
+        status: "success",
+        message: "Senarai " + list.length + " kelas berjaya diselaraskan ke Google Sheet.",
+        count: list.length
+      });
+    }
+
+    if (data.action === "SAVE_CLASS" || data.action === "ADD_CLASS") {
+      var classSheet = getOrCreateSheet(ss, "Kelas");
+      if (classSheet.getLastRow() === 0) {
+        classSheet.appendRow(["ID Kelas", "Nama Kelas", "Tahap", "Bilangan Murid / PC", "Catatan", "Tarikh Kemaskini"]);
+        classSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#e8f0fe");
+      }
+
+      var cls = data.classObj || data.class || {};
+      var cId = String(cls.id || "").trim();
+      var cName = String(cls.name || "").trim();
+      var cLevel = cls.level || "Tahap 1";
+      var cPcs = cls.pcs || 35;
+      var cNotes = cls.notes || "";
+      var cTime = new Date().toLocaleString('ms-MY');
+
+      if (!cId && cName) {
+        cId = "CLS-" + cName.replace(/\s+/g, '').toUpperCase();
+      }
+
+      var allVals = classSheet.getDataRange().getValues();
+      var foundRow = -1;
+      for (var r = 1; r < allVals.length; r++) {
+        var rowId = String(allVals[r][0] || "").trim().toLowerCase();
+        var rowName = String(allVals[r][1] || "").trim().toLowerCase();
+        if ((cId && rowId === cId.toLowerCase()) || (cName && rowName === cName.toLowerCase())) {
+          foundRow = r + 1;
+          break;
+        }
+      }
+
+      if (foundRow !== -1) {
+        classSheet.getRange(foundRow, 1, 1, 6).setValues([[cId, cName, cLevel, cPcs, cNotes, cTime]]);
+      } else {
+        classSheet.appendRow([cId, cName, cLevel, cPcs, cNotes, cTime]);
+      }
+
+      return responseJSON({ status: "success", message: "Kelas " + cName + " berjaya disimpan ke Google Sheet." });
+    }
+
+    if (data.action === "DELETE_CLASS") {
+      var classSheet = getOrCreateSheet(ss, "Kelas");
+      var cId = String(data.id || "").trim().toLowerCase();
+      var cName = String(data.name || "").trim().toLowerCase();
+
+      var allVals = classSheet.getDataRange().getValues();
+      var delRow = -1;
+      for (var r = 1; r < allVals.length; r++) {
+        var rowId = String(allVals[r][0] || "").trim().toLowerCase();
+        var rowName = String(allVals[r][1] || "").trim().toLowerCase();
+        if ((cId && rowId === cId) || (cName && rowName === cName)) {
+          delRow = r + 1;
+          break;
+        }
+      }
+
+      if (delRow !== -1) {
+        classSheet.deleteRow(delRow);
+        return responseJSON({ status: "success", message: "Kelas berjaya dipadam dari Google Sheet." });
+      }
+      return responseJSON({ status: "warning", message: "Kelas tidak ditemui dalam Google Sheet." });
+    }
+
+    // 3. REKOD TEMPAHAN PUKAL (BATCH_ADD / SYNC_ALL) - KESELAMATAN 100% TIADA SLOT TERCICIR
     if (data.action === "BATCH_ADD" || data.action === "SYNC_ALL" || (Array.isArray(data.bookings) && data.bookings.length > 0)) {
       var bookings = data.bookings || [];
       var bookingSheet = getOrCreateSheet(ss, "Tempahan");

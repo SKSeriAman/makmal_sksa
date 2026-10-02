@@ -10,6 +10,7 @@ class BookingStore {
     this.searchQuery = "";
     this.statusFilter = "ALL";
     this.dayFilter = "ALL";
+    this.classes = this.loadClasses();
     this.customWeeklyClasses = this.loadCustomWeeklyClasses();
     this.load();
     this.startAutoPolling(500);
@@ -20,6 +21,8 @@ class BookingStore {
         if (!document.hidden) {
           this.fetchFromPythonBackend();
           this.fetchFromSheet();
+          this.fetchClassesFromPythonBackend();
+          this.fetchClassesFromSheet();
         }
       });
     }
@@ -27,11 +30,14 @@ class BookingStore {
       window.addEventListener('focus', () => {
         this.fetchFromPythonBackend();
         this.fetchFromSheet();
+        this.fetchClassesFromPythonBackend();
+        this.fetchClassesFromSheet();
       });
     }
   }
 
   load() {
+    this.classes = this.loadClasses();
     const saved = localStorage.getItem('labbook_bookings_v4');
     if (saved) {
       try {
@@ -51,6 +57,8 @@ class BookingStore {
     }
     this.fetchFromPythonBackend();
     this.fetchFromSheet();
+    this.fetchClassesFromPythonBackend();
+    this.fetchClassesFromSheet();
   }
 
   startAutoPolling(intervalMs = 500) {
@@ -451,6 +459,213 @@ class BookingStore {
     try {
       localStorage.removeItem('makmal_custom_weekly_classes');
     } catch (e) { }
+  }
+
+  // ========================================================================
+  // PENGURUSAN KELAS MAKMAL (PENYELARAS ICT)
+  // ========================================================================
+  loadClasses() {
+    let list = [];
+    try {
+      const saved = localStorage.getItem('makmal_school_classes_v1');
+      if (saved) {
+        list = JSON.parse(saved);
+      }
+    } catch (e) {
+      list = [];
+    }
+    if (!list || !Array.isArray(list) || list.length === 0) {
+      list = (typeof DEFAULT_SCHOOL_CLASSES !== 'undefined') ? JSON.parse(JSON.stringify(DEFAULT_SCHOOL_CLASSES)) : [];
+    }
+    if (typeof updateGlobalClassesLookup === 'function') {
+      updateGlobalClassesLookup(list);
+    }
+    return list;
+  }
+
+  saveClasses() {
+    try {
+      localStorage.setItem('makmal_school_classes_v1', JSON.stringify(this.classes));
+    } catch (e) {}
+    if (typeof updateGlobalClassesLookup === 'function') {
+      updateGlobalClassesLookup(this.classes);
+    }
+  }
+
+  async addClass(classData) {
+    const rawName = (classData.name || '').trim().toUpperCase();
+    if (!rawName) throw new Error("Sila masukkan nama kelas.");
+
+    const exists = this.classes.find(c => c.name.trim().toUpperCase() === rawName);
+    if (exists) throw new Error(`Kelas "${rawName}" sudah wujud.`);
+
+    const newClass = {
+      id: classData.id || `CLS-${rawName.replace(/\s+/g, '')}`,
+      name: rawName,
+      level: classData.level || 'Tahap 1',
+      pcs: Number(classData.pcs) || 35,
+      notes: classData.notes || '',
+      updatedAt: new Date().toISOString()
+    };
+
+    this.classes.push(newClass);
+    this.classes.sort((a, b) => (a.level || '').localeCompare(b.level || '') || a.name.localeCompare(b.name));
+    this.saveClasses();
+
+    // Sync to Python Flask Backend
+    try {
+      const apiUrl = (typeof getBackendApiUrl === 'function') ? getBackendApiUrl('/classes') : `${PYTHON_API_URL}/classes`;
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newClass)
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Sync to Google Sheet
+    this.syncClassToSheet(newClass, 'SAVE_CLASS');
+
+    return newClass;
+  }
+
+  async updateClass(id, classData) {
+    const cleanId = String(id || '').trim().toLowerCase();
+    const idx = this.classes.findIndex(c => (c.id && c.id.toLowerCase() === cleanId) || c.name.toLowerCase() === cleanId);
+    if (idx === -1) throw new Error("Kelas tidak ditemui.");
+
+    const rawName = (classData.name || this.classes[idx].name).trim().toUpperCase();
+    const duplicate = this.classes.find((c, i) => i !== idx && c.name.trim().toUpperCase() === rawName);
+    if (duplicate) throw new Error(`Nama kelas "${rawName}" telah digunakan.`);
+
+    this.classes[idx] = {
+      ...this.classes[idx],
+      name: rawName,
+      level: classData.level || this.classes[idx].level,
+      pcs: Number(classData.pcs) || this.classes[idx].pcs,
+      notes: (classData.notes !== undefined) ? classData.notes : this.classes[idx].notes,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.classes.sort((a, b) => (a.level || '').localeCompare(b.level || '') || a.name.localeCompare(b.name));
+    this.saveClasses();
+
+    // Sync to Python Flask Backend
+    try {
+      const apiUrl = (typeof getBackendApiUrl === 'function') ? getBackendApiUrl('/classes') : `${PYTHON_API_URL}/classes`;
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.classes[idx])
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Sync to Google Sheet
+    this.syncClassToSheet(this.classes[idx], 'SAVE_CLASS');
+
+    return this.classes[idx];
+  }
+
+  async deleteClass(id) {
+    const cleanId = String(id || '').trim().toLowerCase();
+    const idx = this.classes.findIndex(c => (c.id && c.id.toLowerCase() === cleanId) || c.name.toLowerCase() === cleanId);
+    if (idx === -1) throw new Error("Kelas tidak ditemui.");
+
+    const removed = this.classes.splice(idx, 1)[0];
+    this.saveClasses();
+
+    // Sync to Python Flask Backend
+    try {
+      const apiUrl = (typeof getBackendApiUrl === 'function') ? getBackendApiUrl(`/classes/${encodeURIComponent(removed.id)}`) : `${PYTHON_API_URL}/classes/${encodeURIComponent(removed.id)}`;
+      fetch(apiUrl, { method: 'DELETE' }).catch(() => {});
+    } catch (e) {}
+
+    // Sync to Google Sheet
+    if (GOOGLE_SHEET_API_URL) {
+      try {
+        fetch(GOOGLE_SHEET_API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'DELETE_CLASS', id: removed.id, name: removed.name })
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    return removed;
+  }
+
+  async resetClassesToDefault() {
+    this.classes = (typeof DEFAULT_SCHOOL_CLASSES !== 'undefined') ? JSON.parse(JSON.stringify(DEFAULT_SCHOOL_CLASSES)) : [];
+    this.saveClasses();
+
+    // Sync to Python Flask Backend
+    try {
+      const apiUrl = (typeof getBackendApiUrl === 'function') ? getBackendApiUrl('/classes/reset') : `${PYTHON_API_URL}/classes/reset`;
+      fetch(apiUrl, { method: 'POST' }).catch(() => {});
+    } catch (e) {}
+
+    // Sync to Google Sheet
+    await this.syncClassesToGoogleSheet();
+  }
+
+  syncClassToSheet(classObj, action = 'SAVE_CLASS') {
+    if (!GOOGLE_SHEET_API_URL) return;
+    try {
+      fetch(GOOGLE_SHEET_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action, classObj: classObj })
+      }).catch(err => console.error('Google Sheet Class Sync Error:', err));
+    } catch (e) {}
+  }
+
+  async syncClassesToGoogleSheet() {
+    if (!GOOGLE_SHEET_API_URL) return { count: 0 };
+    try {
+      await fetch(GOOGLE_SHEET_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_CLASSES', classes: this.classes })
+      });
+      return { count: this.classes.length, status: "success" };
+    } catch (e) {
+      return { count: 0, status: "error", error: e };
+    }
+  }
+
+  async fetchClassesFromPythonBackend() {
+    try {
+      const apiUrl = (typeof getBackendApiUrl === 'function') ? getBackendApiUrl('/classes') : `${PYTHON_API_URL}/classes`;
+      let res = await fetch(apiUrl);
+      if (!res.ok && !apiUrl.startsWith('http')) {
+        res = await fetch('http://localhost:5000/api/classes');
+      }
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.status === 'success' && Array.isArray(json.data) && json.data.length > 0) {
+          this.classes = json.data;
+          this.saveClasses();
+          if (window.app) window.app.render();
+        }
+      }
+    } catch (e) {}
+  }
+
+  async fetchClassesFromSheet() {
+    if (!GOOGLE_SHEET_API_URL || GOOGLE_SHEET_API_URL.includes("YOUR_SCRIPT_ID")) return;
+    try {
+      const res = await fetch(`${GOOGLE_SHEET_API_URL}?action=GET_CLASSES`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.status === 'success' && Array.isArray(json.classes) && json.classes.length > 0) {
+          this.classes = json.classes;
+          this.saveClasses();
+          if (window.app) window.app.render();
+        }
+      }
+    } catch (e) {}
   }
 
   // Mengosongkan jadual rasmi janaan automatik untuk minggu tertentu
