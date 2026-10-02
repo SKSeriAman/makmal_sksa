@@ -2248,11 +2248,39 @@ class ProfileView {
     if (this.dom.displayNameHeading) this.dom.displayNameHeading.textContent = user.name;
     if (this.dom.displayEmailBadge) this.dom.displayEmailBadge.textContent = user.email;
 
+    const isCoordinator = this.auth.isLabCoordinator();
+
     if (this.dom.inputName) this.dom.inputName.value = user.name || '';
     if (this.dom.inputEmail) this.dom.inputEmail.value = user.email || '';
-    if (this.dom.selectRole) this.dom.selectRole.value = user.role || 'Guru';
     if (this.dom.inputPhone) this.dom.inputPhone.value = user.phone || '';
     if (this.dom.inputSubject) this.dom.inputSubject.value = user.subject || '';
+
+    if (this.dom.selectRole) {
+      this.dom.selectRole.value = user.role || 'Guru';
+      if (!isCoordinator) {
+        this.dom.selectRole.disabled = true;
+        this.dom.selectRole.style.background = 'var(--gcal-surface, #f8fafc)';
+        this.dom.selectRole.style.color = 'var(--gcal-text-subtle, #64748b)';
+        this.dom.selectRole.style.cursor = 'not-allowed';
+      } else {
+        this.dom.selectRole.disabled = false;
+        this.dom.selectRole.style.background = 'var(--gcal-bg, #ffffff)';
+        this.dom.selectRole.style.color = 'var(--gcal-text-dark, #202124)';
+        this.dom.selectRole.style.cursor = 'default';
+      }
+    }
+
+    const roleHint = document.getElementById('profileRoleHint');
+    if (roleHint) {
+      if (!isCoordinator) {
+        roleHint.innerHTML = `<i data-lucide="lock" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 3px;"></i>Jawatan hanya boleh ditetapkan atau diubah oleh Penyelaras ICT.`;
+        roleHint.style.color = '#64748b';
+      } else {
+        roleHint.innerHTML = `<i data-lucide="shield-check" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 3px; color: #16a34a;"></i>Penyelaras ICT (Akses Penuh)`;
+        roleHint.style.color = '#16a34a';
+      }
+    }
+    if (window.lucide) lucide.createIcons();
   }
 
   handleProfileSubmit(e) {
@@ -2262,8 +2290,10 @@ class ProfileView {
       return;
     }
 
+    const isCoordinator = this.auth.isLabCoordinator();
     const name = this.dom.inputName ? this.dom.inputName.value.trim() : '';
-    const role = this.dom.selectRole ? this.dom.selectRole.value : 'Guru';
+    // Pengguna biasa tidak dibenarkan ubah jawatan (kekalkan peranan sedia ada pengguna)
+    const role = (isCoordinator && this.dom.selectRole) ? this.dom.selectRole.value : (this.auth.currentUser.role || 'Guru');
     const phone = this.dom.inputPhone ? this.dom.inputPhone.value.trim() : '';
     const subject = this.dom.inputSubject ? this.dom.inputSubject.value.trim() : '';
 
