@@ -95,7 +95,7 @@ autoClearUserCache();
 
 
 // Ganti dengan Google Client ID anda daripada Google Cloud Console
-const GOOGLE_CLIENT_ID = "118978054225-phf7i5i89akttsqmqm6vge78oiaa89pt.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "118978054225-587be9hupkr97ovm0c5dp4eks3fjngdc.apps.googleusercontent.com";
 
 const TIME_SLOTS = [
   "07:45 - 08:15",
